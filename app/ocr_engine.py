@@ -40,29 +40,40 @@ def get_available_languages() -> list[str]:
 def preprocess_image(image: np.ndarray) -> np.ndarray:
     """
     Preprocess image for better OCR accuracy.
-    Applies grayscale conversion, denoising, and thresholding.
+    Optimized for digital documents, charts, and tables.
     """
-    # Convert to grayscale if needed
+    # 1. Convert to grayscale if needed
     if len(image.shape) == 3:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     else:
         gray = image
     
-    # Apply slight Gaussian blur to reduce noise
-    blurred = cv2.GaussianBlur(gray, (3, 3), 0)
+    # 2. Rescale image if it's too small (Tesseract works best with text height ~30px)
+    # Most size charts are low-res screenshots.
+    height, width = gray.shape
+    if height < 1000:
+        scale_factor = 2
+        gray = cv2.resize(gray, None, fx=scale_factor, fy=scale_factor, interpolation=cv2.INTER_CUBIC)
     
-    # Apply adaptive thresholding for better text detection
-    thresh = cv2.adaptiveThreshold(
-        blurred, 255,
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY,
-        11, 2
-    )
+    # 3. Increase contrast and sharpen
+    # Use CLAHE (Contrast Limited Adaptive Histogram Equalization) for better local contrast
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    gray = clahe.apply(gray)
     
-    # Denoise
-    denoised = cv2.fastNlMeansDenoising(thresh, None, 10, 7, 21)
+    # Simple sharpening kernel
+    kernel = np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]])
+    gray = cv2.filter2D(gray, -1, kernel)
     
-    return denoised
+    # 4. Thresholding
+    # Binary Otsu is usually best for clean digital text
+    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    
+    # Check if we need to invert (Tesseract prefers black text on white background)
+    # If the majority of the image is black, it's likely white-on-black text
+    if np.mean(thresh) < 127:
+        thresh = cv2.bitwise_not(thresh)
+        
+    return thresh
 
 
 def image_to_cv2(image_bytes: bytes) -> np.ndarray:

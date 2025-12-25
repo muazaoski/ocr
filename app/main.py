@@ -407,15 +407,25 @@ async def root():
                 </div>
                 <input type="file" id="fileInput" hidden accept="image/*">
                 <div style="margin-top: 20px; display: flex; gap: 12px;">
-                    <select id="langSelect" style="flex: 1; background: var(--surface); border: 1px solid var(--border); color: #ccc; border-radius: 8px; padding: 0 12px; font-family: inherit;">
+                    <select id="langSelect" style="flex: 1; background: var(--surface); border: 1px solid var(--border); color: #ccc; border-radius: 8px; padding: 10px; font-family: inherit;">
                         <option value="eng">English (eng)</option>
+                        <option value="ind">Indonesian (ind)</option>
                         <option value="fra">French (fra)</option>
                         <option value="deu">German (deu)</option>
                         <option value="spa">Spanish (spa)</option>
                         <option value="chi_sim">Chinese Simp (chi_sim)</option>
                         <option value="ara">Arabic (ara)</option>
                     </select>
-                    <button id="extractBtn" class="btn btn-primary" style="flex: 2" disabled>Extract Text</button>
+                    <select id="psmSelect" style="flex: 1; background: var(--surface); border: 1px solid var(--border); color: #ccc; border-radius: 8px; padding: 10px; font-family: inherit;">
+                        <option value="3">Auto (Default)</option>
+                        <option value="6">Uniform Block (Table)</option>
+                        <option value="4">Columns (Table)</option>
+                        <option value="11">Sparse Text</option>
+                        <option value="7">Single Line</option>
+                    </select>
+                </div>
+                <div style="margin-top: 12px;">
+                    <button id="extractBtn" class="btn btn-primary" disabled>Extract Text</button>
                 </div>
             </div>
 
@@ -473,6 +483,7 @@ async def root():
         const loader = document.getElementById('loader');
         const copyBtn = document.getElementById('copyBtn');
         const langSelect = document.getElementById('langSelect');
+        const psmSelect = document.getElementById('psmSelect');
         
         let selectedFile = null;
 
@@ -524,7 +535,8 @@ async def root():
             formData.append('file', selectedFile);
             
             try {{
-                const response = await fetch(`/ocr/extract?language=${{langSelect.value}}`, {{
+                const psm = psmSelect.value;
+                const response = await fetch(`/ocr/extract?language=${{langSelect.value}}&psm=${{psm}}`, {{
                     method: 'POST',
                     headers: {{ 'X-API-Key': '{demo_key}' }},
                     body: formData

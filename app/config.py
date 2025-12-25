@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     max_file_size_mb: int = 10
     
     # Allowed Languages
-    allowed_languages: str = "eng,fra,deu,spa,ita,por,nld,pol,rus,jpn,chi_sim,chi_tra,kor,ara"
+    allowed_languages: str = "eng,fra,deu,spa,ita,por,nld,pol,rus,jpn,chi_sim,chi_tra,kor,ara,ind"
     
     # Paths
     base_dir: Path = Path(__file__).parent.parent
