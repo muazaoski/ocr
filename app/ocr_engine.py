@@ -39,38 +39,38 @@ def get_available_languages() -> list[str]:
 
 def preprocess_image(image: np.ndarray) -> np.ndarray:
     """
-    Preprocess image for better OCR accuracy.
-    Optimized for digital documents, charts, and tables.
+    Advanced preprocessing for maximum OCR accuracy.
+    Specifically tuned for tables, charts, and low-res screenshots.
     """
-    # 1. Convert to grayscale if needed
+    # 1. Convert to grayscale
     if len(image.shape) == 3:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     else:
         gray = image
     
-    # 2. Rescale image if it's too small (Tesseract works best with text height ~30px)
-    # Most size charts are low-res screenshots.
+    # 2. Dynamic Upscaling (3x)
+    # Tesseract works best when characters are ~30-40 pixels tall.
+    scale_factor = 3
     height, width = gray.shape
-    if height < 1000:
-        scale_factor = 2
+    if height < 1500:
         gray = cv2.resize(gray, None, fx=scale_factor, fy=scale_factor, interpolation=cv2.INTER_CUBIC)
     
-    # 3. Increase contrast and sharpen
-    # Use CLAHE (Contrast Limited Adaptive Histogram Equalization) for better local contrast
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    gray = clahe.apply(gray)
+    # 3. Bilateral Filter
+    # Removes noise but keeps edges sharp (unlike Gaussian blur)
+    # This helps separate characters from table lines.
+    denoised = cv2.bilateralFilter(gray, 9, 75, 75)
     
-    # Simple sharpening kernel
-    kernel = np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]])
-    gray = cv2.filter2D(gray, -1, kernel)
+    # 4. Adaptive Thresholding
+    # Better for images with mixed backgrounds (e.g. yellow headers vs white cells)
+    thresh = cv2.adaptiveThreshold(
+        denoised, 255, 
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+        cv2.THRESH_BINARY, 21, 11
+    )
     
-    # 4. Thresholding
-    # Binary Otsu is usually best for clean digital text
-    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    
-    # Check if we need to invert (Tesseract prefers black text on white background)
-    # If the majority of the image is black, it's likely white-on-black text
-    if np.mean(thresh) < 127:
+    # 5. Moral Cleanup (Optional: Dilation/Erosion)
+    # If the image is mostly black, invert it
+    if np.mean(thresh) < 120:
         thresh = cv2.bitwise_not(thresh)
         
     return thresh
