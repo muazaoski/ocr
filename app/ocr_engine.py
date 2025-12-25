@@ -39,8 +39,8 @@ def get_available_languages() -> list[str]:
 
 def preprocess_image(image: np.ndarray) -> np.ndarray:
     """
-    Ultra-HD preprocessing for digital charts.
-    Uses Gamma correction and generous padding to fix edge-case errors like '41' -> 'Al'.
+    Clean preprocessing for digital charts.
+    Focuses on high contrast and clear character separation.
     """
     # 1. Convert to grayscale
     if len(image.shape) == 3:
@@ -48,28 +48,26 @@ def preprocess_image(image: np.ndarray) -> np.ndarray:
     else:
         gray = image
 
-    # 2. Rescale (3x) - Lanczos for maximum fidelity
-    gray = cv2.resize(gray, None, fx=3, fy=3, interpolation=cv2.INTER_LANCZOS4)
+    # 2. Rescale (3x) - Keeps character details large enough for AI
+    gray = cv2.resize(gray, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
 
-    # 3. Gamma Correction (Darken text)
-    # This helps distinguish '4' from 'A' by making the mid-tones heavier.
-    gamma = 0.8
-    lookup_table = np.array([((i / 255.0) ** gamma) * 255 for i in np.arange(0, 256)]).astype("uint8")
-    gray = cv2.LUT(gray, lookup_table)
+    # 3. Adaptive Thresholding
+    # This is the most reliable way to handle digital text in different colors (yellow/white/grey)
+    thresh = cv2.adaptiveThreshold(
+        gray, 255, 
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+        cv2.THRESH_BINARY, 31, 15
+    )
+    
+    # 4. Light Denoising (Removes small dots without touching text)
+    kernel = np.ones((2, 2), np.uint8)
+    clean = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
 
-    # 4. CLAHE (Local Contrast)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    gray = clahe.apply(gray)
+    # 5. Generous White Padding
+    # Fixes edge-detection issues on the last line of tables.
+    final = cv2.copyMakeBorder(clean, 50, 50, 50, 50, cv2.BORDER_CONSTANT, value=[255, 255, 255])
 
-    # 5. Sharpness
-    kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
-    gray = cv2.filter2D(gray, -1, kernel)
-
-    # 6. Generous White Padding
-    # Tesseract often fails on the last line (the '41') if it's too close to the edge.
-    gray = cv2.copyMakeBorder(gray, 50, 50, 50, 50, cv2.BORDER_CONSTANT, value=[255, 255, 255])
-
-    return gray
+    return final
 
 
 def image_to_cv2(image_bytes: bytes) -> np.ndarray:
