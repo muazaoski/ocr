@@ -3,5 +3,5 @@ ocr.muazaoski.online {
 }
 
 chart.muazaoski.online {
-    reverse_proxy localhost:3000
+    reverse_proxy localhost:3005
 }
