@@ -39,8 +39,8 @@ def get_available_languages() -> list[str]:
 
 def preprocess_image(image: np.ndarray) -> np.ndarray:
     """
-    Clean preprocessing for digital charts.
-    Focuses on high contrast and clear character separation.
+    Surgical preprocessing to fix digit errors in tables.
+    Focuses on preserving character loops (like '8') and separating text from lines.
     """
     # 1. Convert to grayscale
     if len(image.shape) == 3:
@@ -48,24 +48,23 @@ def preprocess_image(image: np.ndarray) -> np.ndarray:
     else:
         gray = image
 
-    # 2. Rescale (3x) - Keeps character details large enough for AI
-    gray = cv2.resize(gray, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
+    # 2. Rescale (4x) - Large text prevents the AI from merging letters with table lines.
+    gray = cv2.resize(gray, None, fx=4, fy=4, interpolation=cv2.INTER_LANCZOS4)
 
     # 3. Adaptive Thresholding
-    # This is the most reliable way to handle digital text in different colors (yellow/white/grey)
+    # Tuned to be less aggressive so it doesn't "eat" the thin parts of numbers.
     thresh = cv2.adaptiveThreshold(
         gray, 255, 
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-        cv2.THRESH_BINARY, 31, 15
+        cv2.THRESH_BINARY, 35, 20
     )
     
-    # 4. Light Denoising (Removes small dots without touching text)
-    kernel = np.ones((2, 2), np.uint8)
-    clean = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
+    # 4. Median Denoising
+    # Far better than morphological open for keeping the '8' and '5' intact.
+    clean = cv2.medianBlur(thresh, 3)
 
     # 5. Generous White Padding
-    # Fixes edge-detection issues on the last line of tables.
-    final = cv2.copyMakeBorder(clean, 50, 50, 50, 50, cv2.BORDER_CONSTANT, value=[255, 255, 255])
+    final = cv2.copyMakeBorder(clean, 60, 60, 60, 60, cv2.BORDER_CONSTANT, value=[255, 255, 255])
 
     return final
 
