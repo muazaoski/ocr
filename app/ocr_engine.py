@@ -39,37 +39,44 @@ def get_available_languages() -> list[str]:
 
 def preprocess_image(image: np.ndarray) -> np.ndarray:
     """
-    Simpler, higher-contrast preprocessing for digital screenshots.
-    Preserves decimal points and small details by avoiding aggressive blurring.
+    Advanced preprocessing that removes table lines to prevent OCR interference.
+    Great for size charts and spreadsheets.
     """
     # 1. Convert to grayscale
     if len(image.shape) == 3:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     else:
         gray = image
+
+    # 2. Rescale (3x) for better character definition
+    gray = cv2.resize(gray, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
+
+    # 3. Thresholding to create a binary image
+    # Binary inverse so text/lines are white, background is black
+    _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+
+    # 4. Remove Table Lines
+    # Detect horizontal lines
+    horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (40, 1))
+    remove_horizontal = cv2.morphologyEx(binary, cv2.MORPH_OPEN, horizontal_kernel, iterations=2)
     
-    # 2. Rescale (2x) using Lanczos for maximum sharpness
-    # 3x was too much and caused "hollow" letters on low-res images.
-    scale_factor = 2
-    gray = cv2.resize(gray, None, fx=scale_factor, fy=scale_factor, interpolation=cv2.INTER_LANCZOS4)
+    # Detect vertical lines
+    vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 40))
+    remove_vertical = cv2.morphologyEx(binary, cv2.MORPH_OPEN, vertical_kernel, iterations=2)
     
-    # 3. Contrast Stretching (Normalize)
-    # Makes the black text pop against yellow or grey backgrounds.
-    gray = cv2.normalize(gray, None, 0, 255, cv2.NORM_MINMAX)
+    # Combine lines to be removed
+    lines_mask = remove_horizontal + remove_vertical
     
-    # 4. Sharpening
-    kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
-    gray = cv2.filter2D(gray, -1, kernel)
+    # Clean up the original binary image by removing the lines
+    clean_binary = cv2.bitwise_and(binary, cv2.bitwise_not(lines_mask))
     
-    # 5. Simple Thresholding (Otsu)
-    # For digital charts, global thresholding is cleaner than adaptive.
-    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    # 5. Final Inversion (Back to Black text on White background)
+    final = cv2.bitwise_not(clean_binary)
     
-    # 6. Invert if background is dark
-    if np.mean(thresh) < 127:
-        thresh = cv2.bitwise_not(thresh)
-        
-    return thresh
+    # Add a bit of white padding (Tesseract loves padding)
+    final = cv2.copyMakeBorder(final, 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=[255, 255, 255])
+    
+    return final
 
 
 def image_to_cv2(image_bytes: bytes) -> np.ndarray:
