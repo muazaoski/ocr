@@ -259,3 +259,35 @@ def get_usage_stats() -> dict:
         "total_requests_today": total_requests_today,
         "total_requests_all_time": total_requests_all_time
     }
+def get_or_create_demo_key() -> str:
+    """Get existing demo key or create a new one."""
+    keys = _load_keys()
+    
+    # Check if a key named "Public Demo" already exists
+    for key_data in keys.values():
+        if key_data["name"] == "Public Demo":
+            # We need the raw key, but we only have the hash.
+            # For simplicity in this demo, we'll allow a specific hardcoded key if it's the demo one.
+            return "ocr_demo_key_public_feel_free_to_use"
+            
+    # Create it if it doesn't exist
+    key_id = secrets.token_hex(8)
+    raw_key = "ocr_demo_key_public_feel_free_to_use"
+    key_hash = _hash_key(raw_key)
+    
+    key_data = {
+        "id": key_id,
+        "name": "Public Demo",
+        "key_hash": key_hash,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "last_used": None,
+        "is_active": True,
+        "rate_limit_per_minute": 30,
+        "rate_limit_per_day": 500,
+        "total_requests": 0,
+        "requests_log": []
+    }
+    
+    keys[key_id] = key_data
+    _save_keys(keys)
+    return raw_key
