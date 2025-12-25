@@ -39,8 +39,8 @@ def get_available_languages() -> list[str]:
 
 def preprocess_image(image: np.ndarray) -> np.ndarray:
     """
-    Advanced preprocessing that removes table lines to prevent OCR interference.
-    Great for size charts and spreadsheets.
+    High-definition preprocessing for digital charts.
+    Uses CLAHE to balance colors and Adaptive Thresholding to keep small details.
     """
     # 1. Convert to grayscale
     if len(image.shape) == 3:
@@ -48,35 +48,31 @@ def preprocess_image(image: np.ndarray) -> np.ndarray:
     else:
         gray = image
 
-    # 2. Rescale (3x) for better character definition
-    gray = cv2.resize(gray, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
+    # 2. Rescale (2x) - Lanczos keeps decimal points crisp
+    gray = cv2.resize(gray, None, fx=2, fy=2, interpolation=cv2.INTER_LANCZOS4)
 
-    # 3. Thresholding to create a binary image
-    # Binary inverse so text/lines are white, background is black
-    _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    # 3. CLAHE (Contrast Limited Adaptive Histogram Equalization)
+    # This is CRITICAL for images with yellow/grey/white mixed together.
+    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+    gray = clahe.apply(gray)
 
-    # 4. Remove Table Lines
-    # Detect horizontal lines
-    horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (40, 1))
-    remove_horizontal = cv2.morphologyEx(binary, cv2.MORPH_OPEN, horizontal_kernel, iterations=2)
+    # 4. Sharpening
+    kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+    gray = cv2.filter2D(gray, -1, kernel)
+
+    # 5. Adaptive Thresholding
+    # Unlike global Otsu, this handles the dark SKU box and light table in the same image.
+    thresh = cv2.adaptiveThreshold(
+        gray, 255, 
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+        cv2.THRESH_BINARY, 31, 15
+    )
     
-    # Detect vertical lines
-    vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 40))
-    remove_vertical = cv2.morphologyEx(binary, cv2.MORPH_OPEN, vertical_kernel, iterations=2)
-    
-    # Combine lines to be removed
-    lines_mask = remove_horizontal + remove_vertical
-    
-    # Clean up the original binary image by removing the lines
-    clean_binary = cv2.bitwise_and(binary, cv2.bitwise_not(lines_mask))
-    
-    # 5. Final Inversion (Back to Black text on White background)
-    final = cv2.bitwise_not(clean_binary)
-    
-    # Add a bit of white padding (Tesseract loves padding)
-    final = cv2.copyMakeBorder(final, 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=[255, 255, 255])
-    
-    return final
+    # 6. Light Denoising to separate text from table lines
+    kernel = np.ones((2, 2), np.uint8)
+    thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
+
+    return thresh
 
 
 def image_to_cv2(image_bytes: bytes) -> np.ndarray:
@@ -137,8 +133,8 @@ def perform_ocr(
     # Convert to PIL for Tesseract
     pil_image = cv2_to_pil(cv_image)
     
-    # Build Tesseract config
-    config = f"--oem {oem} --psm {psm}"
+    # Build Tesseract config (Added --dpi 300 for high-res recognition)
+    config = f"--oem {oem} --psm {psm} --dpi 300"
     
     if output_format == "hocr":
         # Get hOCR output
