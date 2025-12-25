@@ -560,7 +560,7 @@ async def root():
 
 
 
-@app.get("/admin", response_class=HTMLResponse)
+@app.get(f"/{settings.admin_path}", response_class=HTMLResponse)
 async def admin_dashboard():
     """Admin dashboard for managing API keys."""
     return f"""
@@ -673,7 +673,7 @@ async def admin_dashboard():
 
     <script>
         let adminToken = '';
-        const apiPath = '/admin';
+        const apiPath = '/{settings.admin_path}';
 
         async function login() {{
             const username = document.getElementById('adminUser').value;
