@@ -1,17 +1,16 @@
-"""
-API Routes for admin operations - API key management.
-"""
-from fastapi import APIRouter, HTTPException, Depends
-
+from fastapi import APIRouter, HTTPException, Depends, Request
 from ..auth import get_admin_user, authenticate_admin
 from ..api_keys import (
     create_api_key, list_api_keys, get_api_key_stats,
     delete_api_key, toggle_api_key, get_usage_stats
 )
 from ..models import APIKeyCreate, APIKeyResponse, APIKeyStats, Token, AdminLogin, UsageStats
+from ..config import get_settings
+from ..limiter import limiter
 
 
-router = APIRouter(prefix="/admin", tags=["Admin"])
+settings = get_settings()
+router = APIRouter(prefix=f"/{settings.admin_path}", tags=["Admin"])
 
 
 @router.post(
@@ -20,7 +19,8 @@ router = APIRouter(prefix="/admin", tags=["Admin"])
     summary="Admin login",
     description="Authenticate as admin to manage API keys."
 )
-async def admin_login(credentials: AdminLogin):
+@limiter.limit("5/minute")
+async def admin_login(request: Request, credentials: AdminLogin):
     """Authenticate admin and get access token."""
     token = authenticate_admin(credentials.username, credentials.password)
     

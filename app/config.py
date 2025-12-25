@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     
     # Security
     secret_key: str = "change-this-in-production-use-a-strong-random-key"
+    admin_path: str = "admin"
     admin_username: str = "admin"
     admin_password: str = "admin123"
     algorithm: str = "HS256"

@@ -12,11 +12,10 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-
 from .config import get_settings
+from .limiter import limiter
 from .ocr_engine import get_tesseract_version, get_available_languages
 from .routes.ocr import router as ocr_router
 from .routes.admin import router as admin_router
@@ -24,8 +23,7 @@ from .routes.admin import router as admin_router
 
 settings = get_settings()
 
-# Rate limiter
-limiter = Limiter(key_func=get_remote_address)
+# Rate limiter is now in .limiter module
 
 # Create FastAPI app
 app = FastAPI(
@@ -562,10 +560,10 @@ async def root():
 
 
 
-@app.get("/admin", response_class=HTMLResponse)
+@app.get(f"/{{settings.admin_path}}", response_class=HTMLResponse)
 async def admin_dashboard():
     """Admin dashboard for managing API keys."""
-    return """
+    return f"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -575,8 +573,8 @@ async def admin_dashboard():
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        :root {
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        :root {{
             --bg: #000;
             --surface: #111;
             --border: #222;
@@ -584,38 +582,38 @@ async def admin_dashboard():
             --text-muted: #888;
             --accent: #4ade80;
             --danger: #f87171;
-        }
-        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
-        .container { max-width: 1000px; margin: 0 auto; padding: 40px 24px; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
-        h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+        }}
+        body {{ font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }}
+        .container {{ max-width: 1000px; margin: 0 auto; padding: 40px 24px; }}
+        .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }}
+        h1 {{ font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }}
         
         /* Stats Grid */
-        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 40px; }
-        .stat-card { background: var(--surface); border: 1px solid var(--border); padding: 20px; border-radius: 12px; }
-        .stat-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; }
-        .stat-value { font-size: 24px; font-weight: 700; }
+        .stats {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 40px; }}
+        .stat-card {{ background: var(--surface); border: 1px solid var(--border); padding: 20px; border-radius: 12px; }}
+        .stat-label {{ font-size: 12px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; }}
+        .stat-value {{ font-size: 24px; font-weight: 700; }}
 
         /* Login Overlay */
-        #loginOverlay { position: fixed; inset: 0; background: #000; z-index: 100; display: flex; align-items: center; justify-content: center; }
-        .login-box { background: var(--surface); border: 1px solid var(--border); padding: 32px; border-radius: 16px; width: 340px; }
-        input { width: 100%; background: #000; border: 1px solid var(--border); padding: 12px; border-radius: 8px; color: #fff; margin-bottom: 12px; font-family: inherit; }
-        button { width: 100%; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer; border: none; font-family: inherit; transition: 0.2s; }
-        .btn-primary { background: #fff; color: #000; }
-        .btn-primary:hover { opacity: 0.9; }
-        .btn-danger { background: transparent; border: 1px solid #442222; color: var(--danger); }
-        .btn-danger:hover { background: #442222; }
+        #loginOverlay {{ position: fixed; inset: 0; background: #000; z-index: 100; display: flex; align-items: center; justify-content: center; }}
+        .login-box {{ background: var(--surface); border: 1px solid var(--border); padding: 32px; border-radius: 16px; width: 340px; }}
+        input {{ width: 100%; background: #000; border: 1px solid var(--border); padding: 12px; border-radius: 8px; color: #fff; margin-bottom: 12px; font-family: inherit; }}
+        button {{ width: 100%; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer; border: none; font-family: inherit; transition: 0.2s; }}
+        .btn-primary {{ background: #fff; color: #000; }}
+        .btn-primary:hover {{ opacity: 0.9; }}
+        .btn-danger {{ background: transparent; border: 1px solid #442222; color: var(--danger); }}
+        .btn-danger:hover {{ background: #442222; }}
 
         /* Table */
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
-        th { text-align: left; color: var(--text-muted); padding: 12px; border-bottom: 1px solid var(--border); font-weight: 500; }
-        td { padding: 16px 12px; border-bottom: 1px solid var(--border); }
-        .key-row:hover { background: rgba(255,255,255,0.02); }
-        .tag { font-family: 'JetBrains Mono'; font-size: 12px; background: #222; padding: 2px 6px; border-radius: 4px; }
+        table {{ width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }}
+        th {{ text-align: left; color: var(--text-muted); padding: 12px; border-bottom: 1px solid var(--border); font-weight: 500; }}
+        td {{ padding: 16px 12px; border-bottom: 1px solid var(--border); }}
+        .key-row:hover {{ background: rgba(255,255,255,0.02); }}
+        .tag {{ font-family: 'JetBrains Mono'; font-size: 12px; background: #222; padding: 2px 6px; border-radius: 4px; }}
 
         /* Create Modal */
-        #createModal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 50; display: none; align-items: center; justify-content: center; }
-        .modal-content { background: var(--surface); border: 1px solid var(--border); padding: 32px; border-radius: 16px; width: 400px; }
+        #createModal {{ position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 50; display: none; align-items: center; justify-content: center; }}
+        .modal-content {{ background: var(--surface); border: 1px solid var(--border); padding: 32px; border-radius: 16px; width: 400px; }}
     </style>
 </head>
 <body>
@@ -675,32 +673,33 @@ async def admin_dashboard():
 
     <script>
         let adminToken = '';
+        const apiPath = '/{settings.admin_path}';
 
-        async function login() {
+        async function login() {{
             const username = document.getElementById('adminUser').value;
             const password = document.getElementById('adminPass').value;
-            try {
-                const res = await fetch('/admin/login', {
+            try {{
+                const res = await fetch(`${{apiPath}}/login`, {{
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ username, password }})
+                }});
                 const data = await res.json();
-                if (res.ok) {
+                if (res.ok) {{
                     adminToken = data.access_token;
                     document.getElementById('loginOverlay').style.display = 'none';
                     loadData();
-                } else {
+                }} else {{
                     document.getElementById('loginError').textContent = data.detail;
-                }
-            } catch (e) { console.error(e); }
-        }
+                }}
+            }} catch (e) {{ console.error(e); }}
+        }}
 
-        async function loadData() {
-            try {
+        async function loadData() {{
+            try {{
                 const [statsRes, keysRes] = await Promise.all([
-                    fetch('/admin/stats', { headers: { 'Authorization': `Bearer ${adminToken}` } }),
-                    fetch('/admin/keys', { headers: { 'Authorization': `Bearer ${adminToken}` } })
+                    fetch(`${{apiPath}}/stats`, {{ headers: {{ 'Authorization': `Bearer ${{adminToken}}` }} }}),
+                    fetch(`${{apiPath}}/keys`, {{ headers: {{ 'Authorization': `Bearer ${{adminToken}}` }} }})
                 ]);
                 const stats = await statsRes.json();
                 const keys = await keysRes.json();
@@ -711,56 +710,56 @@ async def admin_dashboard():
 
                 const body = document.getElementById('keyBody');
                 body.innerHTML = '';
-                keys.forEach(k => {
+                keys.forEach(k => {{
                     const row = document.createElement('tr');
                     row.className = 'key-row';
                     row.innerHTML = `
-                        <td>${k.name}</td>
-                        <td class="tag">${k.id}</td>
-                        <td style="color:var(--text-muted)">${new Date(k.created_at).toLocaleDateString()}</td>
-                        <td>${k.total_requests} reqs</td>
+                        <td>${{k.name}}</td>
+                        <td class="tag">${{k.id}}</td>
+                        <td style="color:var(--text-muted)">${{new Date(k.created_at).toLocaleDateString()}}</td>
+                        <td>${{k.total_requests}} reqs</td>
                         <td>
-                            <button onclick="deleteKey('${k.id}')" class="btn-danger" style="padding: 4px 10px; font-size: 11px; width:auto">Delete</button>
+                            <button onclick="deleteKey('${{k.id}}')" class="btn-danger" style="padding: 4px 10px; font-size: 11px; width:auto">Delete</button>
                         </td>
                     `;
                     body.appendChild(row);
-                });
-            } catch (e) { console.error(e); }
-        }
+                }});
+            }} catch (e) {{ console.error(e); }}
+        }}
 
-        function showCreateModal() { document.getElementById('createModal').style.display = 'flex'; }
-        function closeCreateModal() { document.getElementById('createModal').style.display = 'none'; }
+        function showCreateModal() {{ document.getElementById('createModal').style.display = 'flex'; }}
+        function closeCreateModal() {{ document.getElementById('createModal').style.display = 'none'; }}
 
-        async function createKey() {
+        async function createKey() {{
             const name = document.getElementById('newKeyName').value;
-            const res = await fetch('/admin/keys', {
+            const res = await fetch(`${{apiPath}}/keys`, {{
                 method: 'POST',
-                headers: { 
-                    'Authorization': `Bearer ${adminToken}`,
+                headers: {{ 
+                    'Authorization': `Bearer ${{adminToken}}`,
                     'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
+                }},
+                body: JSON.stringify({{
                     name,
                     rate_limit_per_minute: parseInt(document.getElementById('newKeyMinute').value),
                     rate_limit_per_day: parseInt(document.getElementById('newKeyDay').value)
-                })
-            });
+                }})
+            }});
             const data = await res.json();
-            if (res.ok) {
+            if (res.ok) {{
                 alert('Key created! COPY THIS NOW:\\n' + data.key);
                 closeCreateModal();
                 loadData();
-            }
-        }
+            }}
+        }}
 
-        async function deleteKey(id) {
+        async function deleteKey(id) {{
             if (!confirm('Permanently delete this key?')) return;
-            await fetch(`/admin/keys/${id}`, {
+            await fetch(`${{apiPath}}/keys/${{id}}`, {{
                 method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${adminToken}` }
-            });
+                headers: {{ 'Authorization': `Bearer ${{adminToken}}` }}
+            }});
             loadData();
-        }
+        }}
     </script>
 </body>
 </html>
