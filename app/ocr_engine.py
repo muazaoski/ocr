@@ -39,8 +39,8 @@ def get_available_languages() -> list[str]:
 
 def preprocess_image(image: np.ndarray) -> np.ndarray:
     """
-    Surgical preprocessing to fix digit errors in tables.
-    Focuses on preserving character loops (like '8') and separating text from lines.
+    Digital Pure preprocessing. 
+    Optimized for screenshots of charts to prevent digit distortion.
     """
     # 1. Convert to grayscale
     if len(image.shape) == 3:
@@ -48,23 +48,20 @@ def preprocess_image(image: np.ndarray) -> np.ndarray:
     else:
         gray = image
 
-    # 2. Rescale (4x) - Large text prevents the AI from merging letters with table lines.
-    gray = cv2.resize(gray, None, fx=4, fy=4, interpolation=cv2.INTER_LANCZOS4)
+    # 2. Rescale (2.5x) - LANCZOS preserves the dots and thin numbers perfectly.
+    gray = cv2.resize(gray, None, fx=2.5, fy=2.5, interpolation=cv2.INTER_LANCZOS4)
 
-    # 3. Adaptive Thresholding
-    # Tuned to be less aggressive so it doesn't "eat" the thin parts of numbers.
-    thresh = cv2.adaptiveThreshold(
-        gray, 255, 
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-        cv2.THRESH_BINARY, 35, 20
-    )
+    # 3. Simple Global Thresholding (Otsu)
+    # Most digital charts have uniform colors. Global thresholding is cleaner.
+    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     
-    # 4. Median Denoising
-    # Far better than morphological open for keeping the '8' and '5' intact.
-    clean = cv2.medianBlur(thresh, 3)
+    # 4. Invert if background is dark
+    if np.mean(thresh) < 127:
+        thresh = cv2.bitwise_not(thresh)
 
     # 5. Generous White Padding
-    final = cv2.copyMakeBorder(clean, 60, 60, 60, 60, cv2.BORDER_CONSTANT, value=[255, 255, 255])
+    # Essential for Tesseract to recognize characters near the image edges.
+    final = cv2.copyMakeBorder(thresh, 60, 60, 60, 60, cv2.BORDER_CONSTANT, value=[255, 255, 255])
 
     return final
 
