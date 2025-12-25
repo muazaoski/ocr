@@ -1,7 +1,7 @@
 ocr.muazaoski.online {
-    reverse_proxy localhost:8000
+    reverse_proxy 51.79.161.63:8000
 }
 
 chart.muazaoski.online {
-    reverse_proxy localhost:3005
+    reverse_proxy 51.79.161.63:3005
 }
