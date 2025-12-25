@@ -54,6 +54,20 @@ docker compose ps
 docker compose logs -f
 ```
 
+### Step 6: Update Main Caddyfile
+Add this to your main Caddyfile at `/opt/apps/caddy/Caddyfile` (or wherever your main Caddy config is):
+
+```caddy
+ocr.muazaoski.online {
+    reverse_proxy localhost:8000
+}
+```
+
+Then restart Caddy:
+```bash
+docker exec -it caddy caddy reload
+```
+
 ---
 
 ## 📋 Quick Deploy (After Code Changes)
@@ -125,8 +139,7 @@ curl -X POST "https://ocr.muazaoski.online/ocr/extract" \
 docker compose ps
 
 # View logs
-docker compose logs -f ocr-api
-docker compose logs -f ocr-caddy
+docker compose logs -f
 
 # Restart
 docker compose restart
