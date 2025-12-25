@@ -39,8 +39,8 @@ def get_available_languages() -> list[str]:
 
 def preprocess_image(image: np.ndarray) -> np.ndarray:
     """
-    High-definition preprocessing for digital charts.
-    Uses CLAHE to balance colors and Adaptive Thresholding to keep small details.
+    High-definition grayscale preprocessing.
+    Avoids data loss by not using aggressive binary thresholding.
     """
     # 1. Convert to grayscale
     if len(image.shape) == 3:
@@ -48,31 +48,19 @@ def preprocess_image(image: np.ndarray) -> np.ndarray:
     else:
         gray = image
 
-    # 2. Rescale (2x) - Lanczos keeps decimal points crisp
-    gray = cv2.resize(gray, None, fx=2, fy=2, interpolation=cv2.INTER_LANCZOS4)
+    # 2. Rescale (2.5x) - Using Lanczos for high-fidelity edges
+    gray = cv2.resize(gray, None, fx=2.5, fy=2.5, interpolation=cv2.INTER_LANCZOS4)
 
-    # 3. CLAHE (Contrast Limited Adaptive Histogram Equalization)
-    # This is CRITICAL for images with yellow/grey/white mixed together.
-    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+    # 3. CLAHE (Local Contrast Enhancement)
+    # This makes the text sharp without erasing thin lines.
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     gray = clahe.apply(gray)
 
-    # 4. Sharpening
-    kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+    # 4. Subtle Sharpening
+    kernel = np.array([[-0.5,-0.5,-0.5], [-0.5,5,-0.5], [-0.5,-0.5,-0.5]])
     gray = cv2.filter2D(gray, -1, kernel)
 
-    # 5. Adaptive Thresholding
-    # Unlike global Otsu, this handles the dark SKU box and light table in the same image.
-    thresh = cv2.adaptiveThreshold(
-        gray, 255, 
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-        cv2.THRESH_BINARY, 31, 15
-    )
-    
-    # 6. Light Denoising to separate text from table lines
-    kernel = np.ones((2, 2), np.uint8)
-    thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
-
-    return thresh
+    return gray
 
 
 def image_to_cv2(image_bytes: bytes) -> np.ndarray:
