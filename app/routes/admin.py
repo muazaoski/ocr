@@ -10,7 +10,7 @@ from ..limiter import limiter
 
 
 settings = get_settings()
-router = APIRouter(prefix=f"/{settings.admin_path}", tags=["Admin"])
+router = APIRouter(prefix="/admin", tags=["Admin"])
 
 
 @router.post(
