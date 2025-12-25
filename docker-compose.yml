@@ -18,11 +18,11 @@ services:
       - RATE_LIMIT_PER_MINUTE=60
       - RATE_LIMIT_PER_DAY=1000
       - MAX_FILE_SIZE_MB=10
-      - ALLOWED_LANGUAGES=eng,osd
+      - ADMIN_PATH=${ADMIN_PATH:-admin}
+      - ALLOWED_LANGUAGES=${ALLOWED_LANGUAGES:-eng,fra,deu,spa,ita,por,nld,pol,rus,jpn,chi_sim,chi_tra,kor,ara}
     volumes:
       - ocr-data:/app/data
 
 volumes:
   ocr-data:
     driver: local
-
