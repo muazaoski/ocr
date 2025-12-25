@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  ocr-api:
+    build: .
+    container_name: ocr-api
+    restart: unless-stopped
+    expose:
+      - "8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DEBUG=false
+      - SECRET_KEY=${SECRET_KEY:-change-this-in-production}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-change-this-password}
+      - TESSERACT_CMD=tesseract
+      - RATE_LIMIT_PER_MINUTE=60
+      - RATE_LIMIT_PER_DAY=1000
+      - MAX_FILE_SIZE_MB=10
+      - ALLOWED_LANGUAGES=eng,osd
+    volumes:
+      - ocr-data:/app/data
+    networks:
+      - ocr-network
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: ocr-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - ocr-network
+    depends_on:
+      - ocr-api
+
+volumes:
+  ocr-data:
+    driver: local
+  caddy-data:
+    driver: local
+  caddy-config:
+    driver: local
+
+networks:
+  ocr-network:
+    driver: bridge

@@ -1,0 +1,3 @@
+ocr.muazaoski.online {
+    reverse_proxy ocr-api:8000
+}
