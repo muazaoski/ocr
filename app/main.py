@@ -560,7 +560,7 @@ async def root():
 
 
 
-@app.get(f"/{{settings.admin_path}}", response_class=HTMLResponse)
+@app.get(f"/{settings.admin_path}", response_class=HTMLResponse)
 async def admin_dashboard():
     """Admin dashboard for managing API keys."""
     return f"""
