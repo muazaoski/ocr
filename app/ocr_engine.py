@@ -39,8 +39,8 @@ def get_available_languages() -> list[str]:
 
 def preprocess_image(image: np.ndarray) -> np.ndarray:
     """
-    Advanced preprocessing for maximum OCR accuracy.
-    Specifically tuned for tables, charts, and low-res screenshots.
+    Simpler, higher-contrast preprocessing for digital screenshots.
+    Preserves decimal points and small details by avoiding aggressive blurring.
     """
     # 1. Convert to grayscale
     if len(image.shape) == 3:
@@ -48,29 +48,25 @@ def preprocess_image(image: np.ndarray) -> np.ndarray:
     else:
         gray = image
     
-    # 2. Dynamic Upscaling (3x)
-    # Tesseract works best when characters are ~30-40 pixels tall.
-    scale_factor = 3
-    height, width = gray.shape
-    if height < 1500:
-        gray = cv2.resize(gray, None, fx=scale_factor, fy=scale_factor, interpolation=cv2.INTER_CUBIC)
+    # 2. Rescale (2x) using Lanczos for maximum sharpness
+    # 3x was too much and caused "hollow" letters on low-res images.
+    scale_factor = 2
+    gray = cv2.resize(gray, None, fx=scale_factor, fy=scale_factor, interpolation=cv2.INTER_LANCZOS4)
     
-    # 3. Bilateral Filter
-    # Removes noise but keeps edges sharp (unlike Gaussian blur)
-    # This helps separate characters from table lines.
-    denoised = cv2.bilateralFilter(gray, 9, 75, 75)
+    # 3. Contrast Stretching (Normalize)
+    # Makes the black text pop against yellow or grey backgrounds.
+    gray = cv2.normalize(gray, None, 0, 255, cv2.NORM_MINMAX)
     
-    # 4. Adaptive Thresholding
-    # Better for images with mixed backgrounds (e.g. yellow headers vs white cells)
-    thresh = cv2.adaptiveThreshold(
-        denoised, 255, 
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-        cv2.THRESH_BINARY, 21, 11
-    )
+    # 4. Sharpening
+    kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+    gray = cv2.filter2D(gray, -1, kernel)
     
-    # 5. Moral Cleanup (Optional: Dilation/Erosion)
-    # If the image is mostly black, invert it
-    if np.mean(thresh) < 120:
+    # 5. Simple Thresholding (Otsu)
+    # For digital charts, global thresholding is cleaner than adaptive.
+    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    
+    # 6. Invert if background is dark
+    if np.mean(thresh) < 127:
         thresh = cv2.bitwise_not(thresh)
         
     return thresh
