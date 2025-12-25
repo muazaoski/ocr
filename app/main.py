@@ -562,6 +562,211 @@ async def root():
 
 
 
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_dashboard():
+    """Admin dashboard for managing API keys."""
+    return """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR Admin | Control Center</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #000;
+            --surface: #111;
+            --border: #222;
+            --text: #fff;
+            --text-muted: #888;
+            --accent: #4ade80;
+            --danger: #f87171;
+        }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 40px 24px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
+        h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+        
+        /* Stats Grid */
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 40px; }
+        .stat-card { background: var(--surface); border: 1px solid var(--border); padding: 20px; border-radius: 12px; }
+        .stat-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; }
+        .stat-value { font-size: 24px; font-weight: 700; }
+
+        /* Login Overlay */
+        #loginOverlay { position: fixed; inset: 0; background: #000; z-index: 100; display: flex; align-items: center; justify-content: center; }
+        .login-box { background: var(--surface); border: 1px solid var(--border); padding: 32px; border-radius: 16px; width: 340px; }
+        input { width: 100%; background: #000; border: 1px solid var(--border); padding: 12px; border-radius: 8px; color: #fff; margin-bottom: 12px; font-family: inherit; }
+        button { width: 100%; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer; border: none; font-family: inherit; transition: 0.2s; }
+        .btn-primary { background: #fff; color: #000; }
+        .btn-primary:hover { opacity: 0.9; }
+        .btn-danger { background: transparent; border: 1px solid #442222; color: var(--danger); }
+        .btn-danger:hover { background: #442222; }
+
+        /* Table */
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+        th { text-align: left; color: var(--text-muted); padding: 12px; border-bottom: 1px solid var(--border); font-weight: 500; }
+        td { padding: 16px 12px; border-bottom: 1px solid var(--border); }
+        .key-row:hover { background: rgba(255,255,255,0.02); }
+        .tag { font-family: 'JetBrains Mono'; font-size: 12px; background: #222; padding: 2px 6px; border-radius: 4px; }
+
+        /* Create Modal */
+        #createModal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 50; display: none; align-items: center; justify-content: center; }
+        .modal-content { background: var(--surface); border: 1px solid var(--border); padding: 32px; border-radius: 16px; width: 400px; }
+    </style>
+</head>
+<body>
+    <div id="loginOverlay">
+        <div class="login-box">
+            <h2 style="margin-bottom: 24px; text-align: center">Admin Login</h2>
+            <input type="text" id="adminUser" placeholder="Username">
+            <input type="password" id="adminPass" placeholder="Password">
+            <button onclick="login()" class="btn-primary">Login</button>
+            <p id="loginError" style="color: var(--danger); font-size: 12px; margin-top: 12px; text-align: center"></p>
+        </div>
+    </div>
+
+    <div class="container">
+        <header class="header">
+            <div>
+                <h1>Admin Dashboard</h1>
+                <p style="color: var(--text-muted); font-size: 14px">Manage API access and usage</p>
+            </div>
+            <button onclick="showCreateModal()" class="btn-primary" style="width: auto">Create New Key</button>
+        </header>
+
+        <div class="stats" id="statsGrid">
+            <div class="stat-card"><div class="stat-label">Total Keys</div><div class="stat-value" id="stat-keys">-</div></div>
+            <div class="stat-card"><div class="stat-label">Active Keys</div><div class="stat-value" id="stat-active">-</div></div>
+            <div class="stat-card"><div class="stat-label">Requests (24h)</div><div class="stat-value" id="stat-today">-</div></div>
+        </div>
+
+        <div id="keyListContent">
+            <table id="keyTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Key Identifier</th>
+                        <th>Created</th>
+                        <th>Usage</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="keyBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="createModal">
+        <div class="modal-content">
+            <h2 style="margin-bottom: 20px">New API Key</h2>
+            <input type="text" id="newKeyName" placeholder="Key Name (e.g. My Website)">
+            <input type="number" id="newKeyMinute" placeholder="Limit per min (default 60)" value="60">
+            <input type="number" id="newKeyDay" placeholder="Limit per day (default 1000)" value="1000">
+            <div style="display:flex; gap: 12px; margin-top: 20px">
+                <button onclick="closeCreateModal()" class="btn-primary" style="background:#222; color:#fff">Cancel</button>
+                <button onclick="createKey()" class="btn-primary" style="background:var(--accent); color:#000">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let adminToken = '';
+
+        async function login() {
+            const username = document.getElementById('adminUser').value;
+            const password = document.getElementById('adminPass').value;
+            try {
+                const res = await fetch('/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    adminToken = data.access_token;
+                    document.getElementById('loginOverlay').style.display = 'none';
+                    loadData();
+                } else {
+                    document.getElementById('loginError').textContent = data.detail;
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function loadData() {
+            try {
+                const [statsRes, keysRes] = await Promise.all([
+                    fetch('/admin/stats', { headers: { 'Authorization': `Bearer ${adminToken}` } }),
+                    fetch('/admin/keys', { headers: { 'Authorization': `Bearer ${adminToken}` } })
+                ]);
+                const stats = await statsRes.json();
+                const keys = await keysRes.json();
+
+                document.getElementById('stat-keys').textContent = stats.total_api_keys;
+                document.getElementById('stat-active').textContent = stats.active_api_keys;
+                document.getElementById('stat-today').textContent = stats.total_requests_today;
+
+                const body = document.getElementById('keyBody');
+                body.innerHTML = '';
+                keys.forEach(k => {
+                    const row = document.createElement('tr');
+                    row.className = 'key-row';
+                    row.innerHTML = `
+                        <td>${k.name}</td>
+                        <td class="tag">${k.id}</td>
+                        <td style="color:var(--text-muted)">${new Date(k.created_at).toLocaleDateString()}</td>
+                        <td>${k.total_requests} reqs</td>
+                        <td>
+                            <button onclick="deleteKey('${k.id}')" class="btn-danger" style="padding: 4px 10px; font-size: 11px; width:auto">Delete</button>
+                        </td>
+                    `;
+                    body.appendChild(row);
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        function showCreateModal() { document.getElementById('createModal').style.display = 'flex'; }
+        function closeCreateModal() { document.getElementById('createModal').style.display = 'none'; }
+
+        async function createKey() {
+            const name = document.getElementById('newKeyName').value;
+            const res = await fetch('/admin/keys', {
+                method: 'POST',
+                headers: { 
+                    'Authorization': `Bearer ${adminToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    name,
+                    rate_limit_per_minute: parseInt(document.getElementById('newKeyMinute').value),
+                    rate_limit_per_day: parseInt(document.getElementById('newKeyDay').value)
+                })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert('Key created! COPY THIS NOW:\\n' + data.key);
+                closeCreateModal();
+                loadData();
+            }
+        }
+
+        async function deleteKey(id) {
+            if (!confirm('Permanently delete this key?')) return;
+            await fetch(`/admin/keys/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${adminToken}` }
+            });
+            loadData();
+        }
+    </script>
+</body>
+</html>
+    """
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
