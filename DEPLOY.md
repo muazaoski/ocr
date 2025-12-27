@@ -138,8 +138,11 @@ curl -X POST "https://ocr.muazaoski.online/ocr/extract" \
 # View running containers
 docker compose ps
 
-# View logs
-docker compose logs -f
+# View OCR API logs (real-time)
+docker compose logs -f ocr-api
+
+# View last 50 lines
+docker compose logs --tail=50 ocr-api
 
 # Restart
 docker compose restart
@@ -159,11 +162,74 @@ docker compose up -d --build
 
 ---
 
+## 🧠 AI Understanding (Qwen3-VL)
+
+The OCR API includes AI-powered document understanding using **Qwen3-VL-2B-Thinking**.
+
+### Qwen-VL Service Commands
+
+```bash
+# Check status
+systemctl status qwen-vl
+
+# View logs (real-time)
+journalctl -u qwen-vl -f
+
+# View last 100 lines
+journalctl -u qwen-vl -n 100
+
+# Restart Qwen-VL
+systemctl restart qwen-vl
+
+# Stop Qwen-VL
+systemctl stop qwen-vl
+
+# Start Qwen-VL
+systemctl start qwen-vl
+```
+
+### Test AI Understanding
+
+```bash
+# Check VLM status
+curl -H "X-API-Key: ocr_demo_key_public_feel_free_to_use" \
+  https://ocr.muazaoski.online/ocr/understand/status
+
+# Test with an image
+curl -X POST "https://ocr.muazaoski.online/ocr/understand" \
+  -H "X-API-Key: ocr_demo_key_public_feel_free_to_use" \
+  -F "file=@receipt.png" \
+  -F "prompt=Extract all data from this receipt"
+```
+
+### Qwen-VL File Locations
+
+| Path | Purpose |
+|------|---------|
+| `/opt/llama.cpp/build/bin/llama-server` | VLM Server binary |
+| `/opt/models/qwen3-vl/` | Model files |
+| `/etc/systemd/system/qwen-vl.service` | Systemd service |
+
+---
+
+## 📊 View All Logs (Both Services)
+
+```bash
+# Terminal 1: OCR API logs
+docker compose logs -f ocr-api
+
+# Terminal 2: Qwen-VL logs
+journalctl -u qwen-vl -f
+```
+
+---
+
 ## 🌐 URLs
 
 - **Website:** https://ocr.muazaoski.online
 - **API Docs:** https://ocr.muazaoski.online/docs
 - **Health:** https://ocr.muazaoski.online/health
+- **VLM Status:** https://ocr.muazaoski.online/ocr/understand/status
 
 ---
 
@@ -173,8 +239,8 @@ docker compose up -d --build
 |------|---------|
 | `/opt/apps/ocr/` | Main app directory |
 | `/opt/apps/ocr/.env` | Environment (secrets) |
-| `/opt/apps/ocr/Caddyfile` | Reverse proxy config |
 | `/opt/apps/ocr/data/` | API keys (persistent) |
+| `/opt/models/qwen3-vl/` | AI model files |
 
 ---
 
@@ -182,9 +248,20 @@ docker compose up -d --build
 
 ```
 Traffic Flow:
+
+Basic OCR:
 User → Caddy (HTTPS:443) → OCR-API (Python:8000) → Tesseract
+
+AI Understanding:
+User → Caddy (HTTPS:443) → OCR-API (Python:8000) → Qwen-VL (llama.cpp:8081)
 ```
 
-- **Caddy** - Reverse proxy with auto HTTPS
-- **OCR-API** - FastAPI application
-- **Tesseract** - OCR engine (installed in Docker)
+### Components
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| **Caddy** | 443 | Reverse proxy with auto HTTPS |
+| **OCR-API** | 8000 | FastAPI application |
+| **Tesseract** | - | OCR engine (in Docker) |
+| **Qwen-VL** | 8081 | Vision-language AI model |
+
