@@ -134,24 +134,26 @@ async def understand_image(
 
 # Preset prompts for common use cases
 PROMPT_PRESETS = {
-    "size_chart": """Extract ALL measurements from this size chart image as JSON.
-CRITICAL: Include data for EVERY size shown in the image.
+    "size_chart": """You are a size chart data extractor. Extract ALL measurements from this image.
 
-Output this EXACT structure:
+Return a JSON object with:
+1. "sizes" - array of all size labels found (e.g. S, M, L or 36, 38, 40 or XS-3XL etc)
+2. "measurements" - object where each key is a measurement type, and value is an object mapping size to measurement
+
+Example output format:
 {
-    "sizes": ["S", "M", "L", "XL", "XXL", "XXXL"],
+    "sizes": ["S", "M", "L", "XL"],
     "measurements": {
-        "chest_width": {"S": "38\"", "M": "41\"", "L": "44\"", "XL": "48\"", "XXL": "52\"", "XXXL": "56\""},
-        "body_length": {"S": "28\"", "M": "29\"", "L": "30\"", "XL": "31\"", "XXL": "32\"", "XXXL": "33\""},
-        "sleeve_length": {"S": "8\"", "M": "8.5\"", "L": "9\"", "XL": "9.5\"", "XXL": "10\"", "XXXL": "10.5\""}
+        "chest": {"S": "36", "M": "38", "L": "40", "XL": "42"},
+        "length": {"S": "26", "M": "27", "L": "28", "XL": "29"}
     }
 }
 
-Rules:
-1. Extract ALL sizes from the image
-2. For each measurement type, list the value for EVERY size
-3. Use the exact format shown above
-4. Do NOT use alternative formats""",
+Important:
+- Extract the ACTUAL data from the image, not the example above
+- Include ALL sizes and ALL measurements you see
+- Keep original units (cm, inches, etc) if shown
+- Use descriptive measurement names from the image""",
     
     "invoice": """Extract all data from this invoice as JSON.
 Return format:
