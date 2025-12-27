@@ -19,6 +19,7 @@ from .limiter import limiter
 from .ocr_engine import get_tesseract_version, get_available_languages
 from .routes.ocr import router as ocr_router
 from .routes.admin import router as admin_router
+from .routes.understand import router as understand_router
 
 
 settings = get_settings()
@@ -73,6 +74,7 @@ app.add_middleware(
 # Include routers
 app.include_router(ocr_router)
 app.include_router(admin_router)
+app.include_router(understand_router)
 
 
 @app.get("/", response_class=HTMLResponse)
