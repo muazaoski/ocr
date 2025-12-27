@@ -19,7 +19,7 @@ VLM_SERVER_URL = os.getenv("VLM_SERVER_URL", "http://127.0.0.1:8081")
 VLM_TIMEOUT = int(os.getenv("VLM_TIMEOUT", "300"))  # 5 minutes for CPU inference
 
 # Maximum image dimension for VLM processing (reduces encoding time)
-MAX_IMAGE_SIZE = 800
+MAX_IMAGE_SIZE = 512  # Smaller = faster encoding on CPU
 
 
 def resize_image_for_vlm(image_bytes: bytes) -> bytes:

@@ -99,7 +99,7 @@ async def understand_document(
         description="Custom prompt (overrides preset)"
     ),
     temperature: float = Query(
-        0.7, 
+        0.3,  # Lower temp = more focused output, faster
         ge=0.0, 
         le=1.0, 
         description="Sampling temperature (lower = more focused)"
