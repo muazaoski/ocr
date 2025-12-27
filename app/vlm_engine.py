@@ -177,28 +177,37 @@ async def understand_image(
 
 # Preset prompts for common use cases
 PROMPT_PRESETS = {
-    "size_chart": """You are a size chart data extractor. Extract ALL measurements from this image.
+    "size_chart": """You are a size chart data extractor. Extract ALL data from this size chart image.
 
-Return a JSON object with:
-1. "sizes" - array of all size labels found (first column values)
-2. "measurements" - object where each key is the EXACT header name from the image
+The size chart has:
+- FIRST COLUMN: Size labels (e.g., 36, 37, 38 or S, M, L, XL)
+- REMAINING COLUMNS: Measurements for each size
 
-CRITICAL: Use the EXACT header names as shown in the image. Do not translate or rename them.
-For example, if the image shows "UKURAN", use "UKURAN" not "size" or "measurement".
+Return JSON with:
+1. "sizes" - array of values from the FIRST column (size labels)
+2. "measurements" - object where each key is a column header (EXCEPT the first column), mapping size to value
 
-Example output format:
+Example for a table with columns [SIZE, UKURAN]:
 {
-    "sizes": ["36", "37", "38", "39"],
+    "sizes": ["36", "37", "38"],
     "measurements": {
-        "UKURAN": {"36": "23 CM", "37": "23.5 CM", "38": "24 CM", "39": "25 CM"}
+        "UKURAN": {"36": "23 CM", "37": "23.5 CM", "38": "24 CM"}
     }
 }
 
-Rules:
-- Use EXACT header names from the image (preserve language: Indonesian, English, etc)
-- Include ALL sizes and ALL measurements
-- Keep original units (cm, inches, etc)
-- Do NOT rename or translate headers""",
+Example for a table with columns [SIZE, WIDTH, LENGTH]:
+{
+    "sizes": ["S", "M", "L"],
+    "measurements": {
+        "WIDTH": {"S": "46", "M": "48", "L": "50"},
+        "LENGTH": {"S": "66", "M": "68", "L": "70"}
+    }
+}
+
+CRITICAL:
+- The FIRST column is always size labels - do NOT include it in measurements
+- Use EXACT header names from the image
+- Include ALL sizes and ALL measurements""",
     
     "invoice": """Extract all data from this invoice as JSON.
 Return format:
