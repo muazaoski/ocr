@@ -22,7 +22,7 @@ services:
       - ALLOWED_LANGUAGES=${ALLOWED_LANGUAGES:-eng,fra,deu,spa,ita,por,nld,pol,rus,jpn,chi_sim,chi_tra,kor,ara,ind}
       # Qwen3-VL Configuration (runs on host, not in container)
       - VLM_SERVER_URL=http://172.17.0.1:8081
-      - VLM_TIMEOUT=120
+      - VLM_TIMEOUT=180
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
