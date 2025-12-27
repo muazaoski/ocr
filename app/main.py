@@ -426,8 +426,18 @@ async def root():
                         <option value="7">Single Line</option>
                     </select>
                 </div>
-                <div style="margin-top: 12px;">
+                <div style="margin-top: 12px; display: flex; gap: 12px; align-items: center;">
                     <button id="extractBtn" class="btn btn-primary" disabled>Extract Text</button>
+                    <button id="aiBtn" class="btn" style="background: linear-gradient(135deg, #8b5cf6, #6366f1); border: none;" disabled>🧠 AI Understand</button>
+                </div>
+                <div id="aiOptions" style="margin-top: 12px; display: none;">
+                    <select id="presetSelect" style="width: 100%; background: var(--surface); border: 1px solid var(--border); color: #ccc; border-radius: 8px; padding: 10px; font-family: inherit;">
+                        <option value="general">General Understanding</option>
+                        <option value="size_chart">Size Chart</option>
+                        <option value="invoice">Invoice</option>
+                        <option value="receipt">Receipt</option>
+                        <option value="table">Table Data</option>
+                    </select>
                 </div>
             </div>
 
@@ -521,6 +531,7 @@ async def root():
                 preview.style.display = 'block';
                 dzContent.style.display = 'none';
                 extractBtn.disabled = false;
+                document.getElementById('aiBtn').disabled = false;
             }};
             reader.readAsDataURL(file);
         }}
@@ -566,6 +577,54 @@ async def root():
             navigator.clipboard.writeText(resultBox.textContent);
             copyBtn.textContent = 'Copied!';
             setTimeout(() => {{ copyBtn.textContent = 'Copy'; }}, 2000);
+        }});
+
+        // AI Understanding button
+        const aiBtn = document.getElementById('aiBtn');
+        const presetSelect = document.getElementById('presetSelect');
+        
+        aiBtn.addEventListener('click', async () => {{
+            if (!selectedFile) return;
+            
+            loader.style.display = 'flex';
+            aiBtn.disabled = true;
+            extractBtn.disabled = true;
+            resultBox.style.color = 'var(--text)';
+            resultBox.innerHTML = '<span style="color: #8b5cf6;">🧠 AI is analyzing your image... (10-30 seconds)</span>';
+            copyBtn.style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            
+            try {{
+                const preset = presetSelect.value;
+                const response = await fetch(`/ocr/understand?preset=${{preset}}`, {{
+                    method: 'POST',
+                    headers: {{ 'X-API-Key': '{demo_key}' }},
+                    body: formData
+                }});
+                
+                const data = await response.json();
+                
+                if (response.ok) {{
+                    resultBox.style.color = 'var(--text)';
+                    resultBox.innerHTML = '<pre style="white-space: pre-wrap; font-family: JetBrains Mono, monospace; font-size: 13px;">' + 
+                        (data.result || 'No understanding generated.') + 
+                        '</pre><div style="margin-top: 12px; font-size: 11px; color: var(--text-muted);">⏱️ ' + 
+                        Math.round(data.processing_time_ms/1000) + 's | 🧠 ' + data.model + '</div>';
+                    copyBtn.style.display = 'block';
+                }} else {{
+                    resultBox.style.color = '#ff4444';
+                    resultBox.textContent = data.detail || 'Error processing image with AI.';
+                }}
+            }} catch (err) {{
+                resultBox.style.color = '#ff4444';
+                resultBox.textContent = 'Network error or AI server unavailable.';
+            }} finally {{
+                loader.style.display = 'none';
+                aiBtn.disabled = false;
+                extractBtn.disabled = false;
+            }}
         }});
     </script>
 </body>
