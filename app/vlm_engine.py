@@ -180,23 +180,25 @@ PROMPT_PRESETS = {
     "size_chart": """You are a size chart data extractor. Extract ALL measurements from this image.
 
 Return a JSON object with:
-1. "sizes" - array of all size labels found (e.g. S, M, L or 36, 38, 40 or XS-3XL etc)
-2. "measurements" - object where each key is a measurement type, and value is an object mapping size to measurement
+1. "sizes" - array of all size labels found (first column values)
+2. "measurements" - object where each key is the EXACT header name from the image
+
+CRITICAL: Use the EXACT header names as shown in the image. Do not translate or rename them.
+For example, if the image shows "UKURAN", use "UKURAN" not "size" or "measurement".
 
 Example output format:
 {
-    "sizes": ["S", "M", "L", "XL"],
+    "sizes": ["36", "37", "38", "39"],
     "measurements": {
-        "chest": {"S": "36", "M": "38", "L": "40", "XL": "42"},
-        "length": {"S": "26", "M": "27", "L": "28", "XL": "29"}
+        "UKURAN": {"36": "23 CM", "37": "23.5 CM", "38": "24 CM", "39": "25 CM"}
     }
 }
 
-Important:
-- Extract the ACTUAL data from the image, not the example above
-- Include ALL sizes and ALL measurements you see
-- Keep original units (cm, inches, etc) if shown
-- Use descriptive measurement names from the image""",
+Rules:
+- Use EXACT header names from the image (preserve language: Indonesian, English, etc)
+- Include ALL sizes and ALL measurements
+- Keep original units (cm, inches, etc)
+- Do NOT rename or translate headers""",
     
     "invoice": """Extract all data from this invoice as JSON.
 Return format:
