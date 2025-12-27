@@ -5,8 +5,10 @@ Provides document understanding capabilities via local llama.cpp server.
 import base64
 import time
 import httpx
+import io
 from typing import Optional
 import os
+from PIL import Image
 
 from .config import get_settings
 
@@ -14,7 +16,45 @@ settings = get_settings()
 
 # VLM Server configuration
 VLM_SERVER_URL = os.getenv("VLM_SERVER_URL", "http://127.0.0.1:8081")
-VLM_TIMEOUT = int(os.getenv("VLM_TIMEOUT", "120"))  # 2 minutes for CPU inference
+VLM_TIMEOUT = int(os.getenv("VLM_TIMEOUT", "300"))  # 5 minutes for CPU inference
+
+# Maximum image dimension for VLM processing (reduces encoding time)
+MAX_IMAGE_SIZE = 800
+
+
+def resize_image_for_vlm(image_bytes: bytes) -> bytes:
+    """
+    Resize image to reduce VLM processing time.
+    Large images can take 3+ minutes to encode on CPU.
+    """
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        
+        # Get original size
+        width, height = img.size
+        
+        # Skip if already small enough
+        if width <= MAX_IMAGE_SIZE and height <= MAX_IMAGE_SIZE:
+            return image_bytes
+        
+        # Calculate new size maintaining aspect ratio
+        ratio = min(MAX_IMAGE_SIZE / width, MAX_IMAGE_SIZE / height)
+        new_width = int(width * ratio)
+        new_height = int(height * ratio)
+        
+        # Resize with high quality
+        img_resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        
+        # Convert to bytes
+        buffer = io.BytesIO()
+        # Save as JPEG for smaller size, PNG for quality
+        img_resized.save(buffer, format="JPEG", quality=85)
+        
+        return buffer.getvalue()
+    except Exception as e:
+        # If resize fails, return original
+        print(f"Image resize failed: {e}, using original")
+        return image_bytes
 
 
 def get_vlm_status() -> dict:
@@ -31,7 +71,7 @@ def get_vlm_status() -> dict:
 def image_to_base64(image_bytes: bytes) -> str:
     """Convert image bytes to base64 data URL."""
     base64_data = base64.b64encode(image_bytes).decode("utf-8")
-    return f"data:image/png;base64,{base64_data}"
+    return f"data:image/jpeg;base64,{base64_data}"
 
 
 async def understand_image(
@@ -59,8 +99,11 @@ async def understand_image(
     if status["status"] != "healthy":
         raise ConnectionError(f"VLM server not available: {status.get('error', 'Unknown error')}")
     
+    # Resize large images to speed up processing
+    processed_image = resize_image_for_vlm(image_bytes)
+    
     # Convert image to base64
-    image_url = image_to_base64(image_bytes)
+    image_url = image_to_base64(processed_image)
     
     # Build the request payload (OpenAI-compatible format)
     payload = {
