@@ -107,12 +107,28 @@ async def understand_image(
     if "choices" in data and len(data["choices"]) > 0:
         message = data["choices"][0].get("message", {})
         content = message.get("content", "")
+        
+        # Thinking model wraps output in <think>...</think> tags
+        # The actual response comes AFTER the thinking
+        if "</think>" in content:
+            # Split and get the part after thinking
+            parts = content.split("</think>")
+            if len(parts) > 1:
+                # Get the response after thinking, clean it up
+                content = parts[-1].strip()
+            else:
+                # No content after thinking, show the thinking itself
+                content = content.replace("<think>", "").replace("</think>", "").strip()
+        elif "<think>" in content:
+            # Incomplete thinking tag, just show what we have
+            content = content.replace("<think>", "").strip()
     
     return {
         "result": content,
         "processing_time_ms": processing_time,
         "model": "qwen3-vl-2b-thinking",
-        "tokens_used": data.get("usage", {})
+        "tokens_used": data.get("usage", {}),
+        "raw_has_think_tag": "</think>" in str(data) if data else False
     }
 
 
