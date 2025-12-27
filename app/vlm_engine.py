@@ -177,37 +177,36 @@ async def understand_image(
 
 # Preset prompts for common use cases
 PROMPT_PRESETS = {
-    "size_chart": """You are a size chart data extractor. Extract ALL data from this size chart image.
+    "size_chart": """Extract size chart data as JSON.
 
-The size chart has:
-- FIRST COLUMN: Size labels (e.g., 36, 37, 38 or S, M, L, XL)
-- REMAINING COLUMNS: Measurements for each size
-
-Return JSON with:
-1. "sizes" - array of values from the FIRST column (size labels)
-2. "measurements" - object where each key is a column header (EXCEPT the first column), mapping size to value
-
-Example for a table with columns [SIZE, UKURAN]:
+EXACT FORMAT REQUIRED:
 {
-    "sizes": ["36", "37", "38"],
+    "sizes": ["size1", "size2", ...],
     "measurements": {
-        "UKURAN": {"36": "23 CM", "37": "23.5 CM", "38": "24 CM"}
+        "COLUMN_NAME": {"size1": "value1", "size2": "value2", ...}
     }
 }
 
-Example for a table with columns [SIZE, WIDTH, LENGTH]:
+Rules:
+1. "sizes" = array of size labels from first column (e.g., ["36", "37", "38"] or ["S", "M", "L"])
+2. "measurements" = object where each key maps to an object of {size: value} pairs
+3. Do NOT include the first column (size labels) in measurements
+4. Each measurement MUST be an object like {"36": "23 CM", "37": "23.5 CM"}
+
+Example input table:
+SIZE | UKURAN
+36   | 23 CM
+37   | 23.5 CM
+
+Example output:
 {
-    "sizes": ["S", "M", "L"],
+    "sizes": ["36", "37"],
     "measurements": {
-        "WIDTH": {"S": "46", "M": "48", "L": "50"},
-        "LENGTH": {"S": "66", "M": "68", "L": "70"}
+        "UKURAN": {"36": "23 CM", "37": "23.5 CM"}
     }
 }
 
-CRITICAL:
-- The FIRST column is always size labels - do NOT include it in measurements
-- Use EXACT header names from the image
-- Include ALL sizes and ALL measurements""",
+Return ONLY valid JSON, no explanations.""",
     
     "invoice": """Extract all data from this invoice as JSON.
 Return format:
