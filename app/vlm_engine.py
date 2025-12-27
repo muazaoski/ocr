@@ -134,15 +134,24 @@ async def understand_image(
 
 # Preset prompts for common use cases
 PROMPT_PRESETS = {
-    "size_chart": """Analyze this size chart image and extract all data as JSON.
-Return format:
+    "size_chart": """Extract ALL measurements from this size chart image as JSON.
+CRITICAL: Include data for EVERY size shown in the image.
+
+Output this EXACT structure:
 {
-    "sizes": ["S", "M", "L", ...],
+    "sizes": ["S", "M", "L", "XL", "XXL", "XXXL"],
     "measurements": {
-        "measurement_name": {"size": value, ...}
-    },
-    "notes": "any additional notes"
-}""",
+        "chest_width": {"S": "38", "M": "41", "L": "44", "XL": "48", "XXL": "52", "XXXL": "56"},
+        "body_length": {"S": "28", "M": "29", "L": "30", "XL": "31", "XXL": "32", "XXXL": "33"},
+        "sleeve_length": {"S": "8", "M": "8.5", "L": "9", "XL": "9.5", "XXL": "10", "XXXL": "10.5"}
+    }
+}
+
+Rules:
+1. Extract ALL sizes from the image
+2. For each measurement type, list the value for EVERY size
+3. Use the exact format shown above
+4. Do NOT use alternative formats""",
     
     "invoice": """Extract all data from this invoice as JSON.
 Return format:
