@@ -38,7 +38,7 @@ async def understand_image(
     image_bytes: bytes,
     prompt: str = "Extract all text and data from this image. Return as structured JSON.",
     temperature: float = 0.7,
-    max_tokens: int = 2048
+    max_tokens: int = 1024  # Reduced for faster CPU inference
 ) -> dict:
     """
     Send an image to Qwen3-VL for understanding.
