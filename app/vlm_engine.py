@@ -141,9 +141,9 @@ Output this EXACT structure:
 {
     "sizes": ["S", "M", "L", "XL", "XXL", "XXXL"],
     "measurements": {
-        "chest_width": {"S": "38", "M": "41", "L": "44", "XL": "48", "XXL": "52", "XXXL": "56"},
-        "body_length": {"S": "28", "M": "29", "L": "30", "XL": "31", "XXL": "32", "XXXL": "33"},
-        "sleeve_length": {"S": "8", "M": "8.5", "L": "9", "XL": "9.5", "XXL": "10", "XXXL": "10.5"}
+        "chest_width": {"S": "38\"", "M": "41\"", "L": "44\"", "XL": "48\"", "XXL": "52\"", "XXXL": "56\""},
+        "body_length": {"S": "28\"", "M": "29\"", "L": "30\"", "XL": "31\"", "XXL": "32\"", "XXXL": "33\""},
+        "sleeve_length": {"S": "8\"", "M": "8.5\"", "L": "9\"", "XL": "9.5\"", "XXL": "10\"", "XXXL": "10.5\""}
     }
 }
 
