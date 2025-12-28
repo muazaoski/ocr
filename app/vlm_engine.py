@@ -1,12 +1,14 @@
 """
 Vision Language Model Engine using Qwen3VL-2B-Instruct.
 Provides document understanding capabilities via local llama.cpp server.
+Supports parallel processing with configurable concurrency limits.
 """
+import asyncio
 import base64
 import time
 import httpx
 import io
-from typing import Optional
+from typing import Optional, List
 import os
 from PIL import Image
 
@@ -17,9 +19,20 @@ settings = get_settings()
 # VLM Server configuration
 VLM_SERVER_URL = os.getenv("VLM_SERVER_URL", "http://127.0.0.1:8081")
 VLM_TIMEOUT = int(os.getenv("VLM_TIMEOUT", "300"))  # 5 minutes for CPU inference
+VLM_MAX_CONCURRENT = int(os.getenv("VLM_MAX_CONCURRENT", "2"))  # Max parallel VLM requests
 
 # Maximum image dimension for VLM processing (reduces encoding time)
 MAX_IMAGE_SIZE = 512  # Smaller = faster encoding on CPU
+
+# Global semaphore for limiting concurrent VLM requests
+_vlm_semaphore: Optional[asyncio.Semaphore] = None
+
+def get_vlm_semaphore() -> asyncio.Semaphore:
+    """Get or create the VLM semaphore for concurrency control."""
+    global _vlm_semaphore
+    if _vlm_semaphore is None:
+        _vlm_semaphore = asyncio.Semaphore(VLM_MAX_CONCURRENT)
+    return _vlm_semaphore
 
 
 def resize_image_for_vlm(image_bytes: bytes) -> bytes:
@@ -82,6 +95,7 @@ async def understand_image(
 ) -> dict:
     """
     Send an image to Qwen3-VL for understanding.
+    Uses semaphore to limit concurrent requests.
     
     Args:
         image_bytes: Raw image bytes
@@ -92,86 +106,153 @@ async def understand_image(
     Returns:
         dict with result and metadata
     """
-    start_time = time.time()
+    # Use semaphore to limit concurrent VLM requests
+    semaphore = get_vlm_semaphore()
     
-    # Check server health first
-    status = get_vlm_status()
-    if status["status"] != "healthy":
-        raise ConnectionError(f"VLM server not available: {status.get('error', 'Unknown error')}")
-    
-    # Resize large images to speed up processing
-    processed_image = resize_image_for_vlm(image_bytes)
-    
-    # Convert image to base64
-    image_url = image_to_base64(processed_image)
-    
-    # Build the request payload (OpenAI-compatible format)
-    payload = {
-        "model": "qwen3-vl",
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": image_url}
-                    },
-                    {
-                        "type": "text",
-                        "text": prompt
-                    }
-                ]
-            }
-        ],
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-        "stream": False
-    }
-    
-    try:
-        async with httpx.AsyncClient(timeout=VLM_TIMEOUT) as client:
-            response = await client.post(
-                f"{VLM_SERVER_URL}/v1/chat/completions",
-                json=payload
-            )
-            response.raise_for_status()
-            data = response.json()
-    except httpx.TimeoutException:
-        raise TimeoutError(f"VLM request timed out after {VLM_TIMEOUT} seconds")
-    except httpx.HTTPStatusError as e:
-        raise RuntimeError(f"VLM server error: {e.response.status_code} - {e.response.text}")
-    except Exception as e:
-        raise RuntimeError(f"VLM request failed: {str(e)}")
-    
-    processing_time = (time.time() - start_time) * 1000
-    
-    # Extract the response content
-    content = ""
-    if "choices" in data and len(data["choices"]) > 0:
-        message = data["choices"][0].get("message", {})
-        content = message.get("content", "")
+    async with semaphore:
+        start_time = time.time()
         
-        # Thinking model wraps output in <think>...</think> tags
-        # The actual response comes AFTER the thinking
-        if "</think>" in content:
-            # Split and get the part after thinking
-            parts = content.split("</think>")
-            if len(parts) > 1:
-                # Get the response after thinking, clean it up
-                content = parts[-1].strip()
-            else:
-                # No content after thinking, show the thinking itself
-                content = content.replace("<think>", "").replace("</think>", "").strip()
-        elif "<think>" in content:
-            # Incomplete thinking tag, just show what we have
-            content = content.replace("<think>", "").strip()
+        # Check server health first
+        status = get_vlm_status()
+        if status["status"] != "healthy":
+            raise ConnectionError(f"VLM server not available: {status.get('error', 'Unknown error')}")
+        
+        # Resize large images to speed up processing
+        processed_image = resize_image_for_vlm(image_bytes)
+        
+        # Convert image to base64
+        image_url = image_to_base64(processed_image)
+        
+        # Build the request payload (OpenAI-compatible format)
+        payload = {
+            "model": "qwen3-vl",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": image_url}
+                        },
+                        {
+                            "type": "text",
+                            "text": prompt
+                        }
+                    ]
+                }
+            ],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": False
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=VLM_TIMEOUT) as client:
+                response = await client.post(
+                    f"{VLM_SERVER_URL}/v1/chat/completions",
+                    json=payload
+                )
+                response.raise_for_status()
+                data = response.json()
+        except httpx.TimeoutException:
+            raise TimeoutError(f"VLM request timed out after {VLM_TIMEOUT} seconds")
+        except httpx.HTTPStatusError as e:
+            raise RuntimeError(f"VLM server error: {e.response.status_code} - {e.response.text}")
+        except Exception as e:
+            raise RuntimeError(f"VLM request failed: {str(e)}")
+        
+        processing_time = (time.time() - start_time) * 1000
+        
+        # Extract the response content
+        content = ""
+        if "choices" in data and len(data["choices"]) > 0:
+            message = data["choices"][0].get("message", {})
+            content = message.get("content", "")
+            
+            # Thinking model wraps output in <think>...</think> tags
+            # The actual response comes AFTER the thinking
+            if "</think>" in content:
+                # Split and get the part after thinking
+                parts = content.split("</think>")
+                if len(parts) > 1:
+                    # Get the response after thinking, clean it up
+                    content = parts[-1].strip()
+                else:
+                    # No content after thinking, show the thinking itself
+                    content = content.replace("<think>", "").replace("</think>", "").strip()
+            elif "<think>" in content:
+                # Incomplete thinking tag, just show what we have
+                content = content.replace("<think>", "").strip()
+        
+        return {
+            "result": content,
+            "processing_time_ms": processing_time,
+            "model": "qwen3-vl-2b-thinking",
+            "tokens_used": data.get("usage", {}),
+            "concurrent_limit": VLM_MAX_CONCURRENT,
+            "raw_has_think_tag": "</think>" in str(data) if data else False
+        }
+
+
+async def batch_understand_images(
+    images: List[tuple],  # List of (filename, image_bytes, prompt) tuples
+    temperature: float = 0.7,
+    max_tokens: int = 1024
+) -> dict:
+    """
+    Process multiple images in parallel using VLM.
+    Uses semaphore to limit concurrent requests.
+    
+    Args:
+        images: List of (filename, image_bytes, prompt) tuples
+        temperature: Sampling temperature
+        max_tokens: Max tokens per response
+    
+    Returns:
+        Batch result dict with all results
+    """
+    import time as time_module
+    start_time = time_module.time()
+    
+    async def process_single(item):
+        """Process a single image."""
+        filename, image_bytes, prompt = item
+        try:
+            result = await understand_image(
+                image_bytes,
+                prompt=prompt,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+            return {
+                "filename": filename,
+                "success": True,
+                "result": result["result"],
+                "processing_time_ms": result["processing_time_ms"]
+            }
+        except Exception as e:
+            return {
+                "filename": filename,
+                "success": False,
+                "error": str(e)
+            }
+    
+    # Process all images concurrently (semaphore limits actual parallelism)
+    tasks = [process_single(item) for item in images]
+    results = await asyncio.gather(*tasks)
+    
+    # Calculate stats
+    successful = sum(1 for r in results if r["success"])
+    failed = len(results) - successful
+    total_time = (time_module.time() - start_time) * 1000
     
     return {
-        "result": content,
-        "processing_time_ms": processing_time,
-        "model": "qwen3-vl-2b-thinking",
-        "tokens_used": data.get("usage", {}),
-        "raw_has_think_tag": "</think>" in str(data) if data else False
+        "total_files": len(images),
+        "successful": successful,
+        "failed": failed,
+        "processing_time_ms": total_time,
+        "concurrent_limit": VLM_MAX_CONCURRENT,
+        "results": results
     }
 
 

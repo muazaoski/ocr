@@ -1,13 +1,14 @@
 """
 API Routes for AI-powered document understanding.
 Uses Qwen3-VL-2B-Thinking for vision-language tasks.
+Supports parallel batch processing.
 """
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, File, UploadFile, HTTPException, Depends, Form, Query
 from pydantic import BaseModel
 
 from ..auth import get_api_key
-from ..vlm_engine import understand_image, get_vlm_status, get_preset_prompt, PROMPT_PRESETS
+from ..vlm_engine import understand_image, get_vlm_status, get_preset_prompt, PROMPT_PRESETS, batch_understand_images, VLM_MAX_CONCURRENT
 from ..config import get_settings
 
 
@@ -218,3 +219,98 @@ async def understand_size_chart(
         raise HTTPException(status_code=504, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class BatchUnderstandResult(BaseModel):
+    """Response model for batch understanding."""
+    total_files: int
+    successful: int
+    failed: int
+    processing_time_ms: float
+    concurrent_limit: int
+    results: list
+
+
+@router.post(
+    "/understand/batch",
+    response_model=BatchUnderstandResult,
+    summary="Batch AI understanding (parallel)",
+    description=f"""
+Process multiple images in parallel using AI.
+Maximum {VLM_MAX_CONCURRENT} concurrent VLM requests.
+
+Each image is processed simultaneously, making batch processing 
+much faster than sequential individual requests.
+
+**Maximum 10 files per batch.**
+"""
+)
+async def batch_understand_documents(
+    files: List[UploadFile] = File(..., description="Image files (max 10)"),
+    preset: Optional[str] = Query(
+        "general", 
+        description="Prompt preset for all images"
+    ),
+    prompt: Optional[str] = Form(
+        None, 
+        description="Custom prompt (overrides preset)"
+    ),
+    temperature: float = Query(
+        0.3,
+        ge=0.0, 
+        le=1.0, 
+        description="Sampling temperature"
+    ),
+    max_tokens: int = Query(
+        2048, 
+        ge=256, 
+        le=4096, 
+        description="Maximum tokens per image"
+    ),
+    api_key: dict = Depends(get_api_key)
+):
+    """
+    Process multiple images in parallel using AI vision-language model.
+    
+    Uses a semaphore to limit concurrent VLM requests to prevent
+    overwhelming the server. Images are processed as fast as the
+    concurrency limit allows.
+    """
+    if len(files) > 10:
+        raise HTTPException(
+            status_code=400,
+            detail="Maximum 10 files per batch request"
+        )
+    
+    # Determine prompt to use
+    final_prompt = prompt if prompt else get_preset_prompt(preset or "general")
+    
+    # Collect valid images
+    images = []
+    for file in files:
+        content_type = file.content_type or ""
+        if not content_type.startswith("image/"):
+            continue
+        
+        image_bytes = await file.read()
+        if len(image_bytes) <= settings.max_file_size_bytes:
+            images.append((file.filename or "unknown", image_bytes, final_prompt))
+    
+    if not images:
+        raise HTTPException(
+            status_code=400,
+            detail="No valid image files found"
+        )
+    
+    try:
+        result = await batch_understand_images(
+            images,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+        return BatchUnderstandResult(**result)
+    
+    except ConnectionError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Batch processing failed: {str(e)}")

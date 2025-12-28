@@ -222,10 +222,11 @@ def perform_batch_ocr(
     language: str = "eng",
     psm: int = 3,
     oem: int = 3,
-    preprocess: bool = True
+    preprocess: bool = True,
+    max_workers: int = 4  # Parallel workers
 ) -> dict:
     """
-    Perform OCR on multiple images.
+    Perform OCR on multiple images in parallel.
     
     Args:
         images: List of (filename, bytes) tuples
@@ -233,16 +234,21 @@ def perform_batch_ocr(
         psm: Page segmentation mode
         oem: OCR engine mode
         preprocess: Whether to apply preprocessing
+        max_workers: Maximum parallel workers (default: 4)
     
     Returns:
         Batch result dict
     """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    
     start_time = time.time()
     results = []
     successful = 0
     failed = 0
     
-    for filename, image_bytes in images:
+    def process_single_image(item):
+        """Process a single image - runs in thread pool."""
+        filename, image_bytes = item
         try:
             result = perform_ocr(
                 image_bytes,
@@ -252,20 +258,39 @@ def perform_batch_ocr(
                 preprocess=preprocess,
                 output_format="text"
             )
-            results.append({
+            return {
                 "filename": filename,
                 "success": True,
                 "text": result["text"],
                 "confidence": result["confidence"]
-            })
-            successful += 1
+            }
         except Exception as e:
-            results.append({
+            return {
                 "filename": filename,
                 "success": False,
                 "error": str(e)
-            })
-            failed += 1
+            }
+    
+    # Process images in parallel using thread pool
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all tasks
+        future_to_filename = {
+            executor.submit(process_single_image, item): item[0] 
+            for item in images
+        }
+        
+        # Collect results as they complete
+        for future in as_completed(future_to_filename):
+            result = future.result()
+            results.append(result)
+            if result["success"]:
+                successful += 1
+            else:
+                failed += 1
+    
+    # Sort results by original order
+    filename_order = {item[0]: i for i, item in enumerate(images)}
+    results.sort(key=lambda r: filename_order.get(r["filename"], 999))
     
     processing_time = (time.time() - start_time) * 1000
     
@@ -274,5 +299,6 @@ def perform_batch_ocr(
         "successful": successful,
         "failed": failed,
         "processing_time_ms": processing_time,
+        "parallel_workers": max_workers,
         "results": results
     }
