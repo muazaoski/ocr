@@ -177,14 +177,15 @@ async def understand_image(
 
 # Preset prompts for common use cases
 PROMPT_PRESETS = {
-    "size_chart": """Extract size chart data as JSON.
+    "size_chart": """Extract size chart data AND any SKU/article number as JSON.
 
 EXACT FORMAT REQUIRED:
 {
     "sizes": ["size1", "size2", ...],
     "measurements": {
         "COLUMN_NAME": {"size1": "value1", "size2": "value2", ...}
-    }
+    },
+    "sku": "extracted SKU or article number if found, otherwise empty string"
 }
 
 Rules:
@@ -192,8 +193,10 @@ Rules:
 2. "measurements" = object where each key maps to an object of {size: value} pairs
 3. Do NOT include the first column (size labels) in measurements
 4. Each measurement MUST be an object like {"36": "23 CM", "37": "23.5 CM"}
+5. "sku" = Look for any text like "SKU: XXX", "Article: XXX", "Art: XXX", "Model: XXX", "Kode: XXX", or any product code pattern like "207-00635" in the image. Extract just the code/number.
 
-Example input table:
+Example input table with SKU:
+SKU 207-00635
 SIZE | UKURAN
 36   | 23 CM
 37   | 23.5 CM
@@ -203,7 +206,8 @@ Example output:
     "sizes": ["36", "37"],
     "measurements": {
         "UKURAN": {"36": "23 CM", "37": "23.5 CM"}
-    }
+    },
+    "sku": "207-00635"
 }
 
 Return ONLY valid JSON, no explanations.""",
