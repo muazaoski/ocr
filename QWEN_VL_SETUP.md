@@ -1,8 +1,8 @@
-# 🧠 Qwen3-VL-2B-Thinking Setup Guide
+# 🧠 Qwen3-VL-2B-Instruct Setup Guide
 
 ## Overview
 
-This adds AI-powered document understanding to your OCR API using the Qwen3-VL-2B-Thinking vision-language model.
+This adds AI-powered document understanding to your OCR API using the Qwen3-VL-2B-Instruct vision-language model.
 
 **New Endpoint:** `POST /ocr/understand`
 - Send an image → Get structured understanding (not just text extraction)
@@ -27,6 +27,18 @@ The system runs two services:
 
 ---
 
+## Current Model
+
+| Attribute | Value |
+|-----------|-------|
+| **Model** | Qwen3VL-2B-Instruct |
+| **File** | `Qwen3VL-2B-Instruct-Q4_K_M.gguf` |
+| **Quantization** | Q4_K_M (~2GB) |
+| **Vision Encoder** | `mmproj-Qwen3VL-2B-Instruct-f16.gguf` |
+| **Context Length** | 4096 tokens |
+
+---
+
 ## VPS Requirements
 
 | Resource | Minimum | Recommended |
@@ -47,10 +59,10 @@ mkdir -p /opt/models/qwen3-vl
 cd /opt/models/qwen3-vl
 
 # Download model (Q4_K_M - best balance)
-wget https://huggingface.co/unsloth/Qwen3-VL-2B-Thinking-GGUF/resolve/main/Qwen3-VL-2B-Thinking-Q4_K_M.gguf
+wget https://huggingface.co/unsloth/Qwen3VL-2B-Instruct-GGUF/resolve/main/Qwen3VL-2B-Instruct-Q4_K_M.gguf
 
 # Download vision encoder
-wget https://huggingface.co/unsloth/Qwen3-VL-2B-Thinking-GGUF/resolve/main/mmproj-Qwen3-VL-2B-Thinking-f16.gguf
+wget https://huggingface.co/unsloth/Qwen3VL-2B-Instruct-GGUF/resolve/main/mmproj-Qwen3VL-2B-Instruct-f16.gguf
 ```
 
 ### Step 2: Install llama.cpp (on VPS)
@@ -79,8 +91,8 @@ Type=simple
 User=root
 WorkingDirectory=/opt/llama.cpp
 ExecStart=/opt/llama.cpp/llama-server \
-    -m /opt/models/qwen3-vl/Qwen3-VL-2B-Thinking-Q4_K_M.gguf \
-    --mmproj /opt/models/qwen3-vl/mmproj-Qwen3-VL-2B-Thinking-f16.gguf \
+    -m /opt/models/qwen3-vl/Qwen3VL-2B-Instruct-Q4_K_M.gguf \
+    --mmproj /opt/models/qwen3-vl/mmproj-Qwen3VL-2B-Instruct-f16.gguf \
     --host 127.0.0.1 \
     --port 8081 \
     -c 4096 \
@@ -122,6 +134,13 @@ curl -X POST "https://ocr.muazaoski.online/ocr/understand" \
   -F "prompt=Extract all size measurements as JSON"
 ```
 
+**With preset:**
+```bash
+curl -X POST "https://ocr.muazaoski.online/ocr/understand?preset=size_chart" \
+  -H "X-API-Key: your-api-key" \
+  -F "file=@size_chart.png"
+```
+
 **Response:**
 ```json
 {
@@ -130,12 +149,23 @@ curl -X POST "https://ocr.muazaoski.online/ocr/understand" \
     "measurements": {
       "chest": {"S": 36, "M": 38, "L": 40, "XL": 42},
       "waist": {"S": 28, "M": 30, "L": 32, "XL": 34}
-    }
+    },
+    "sku": "401-02779"
   },
   "processing_time_ms": 1234,
-  "model": "qwen3-vl-2b-thinking"
+  "model": "qwen3-vl-2b-instruct"
 }
 ```
+
+---
+
+## Available Presets
+
+| Preset | Description |
+|--------|-------------|
+| `size_chart` | Extracts sizes, measurements, and SKU |
+| `invoice` | Extracts vendor, items, totals |
+| `receipt` | Extracts store, items, totals |
 
 ---
 
@@ -155,8 +185,8 @@ curl -X POST "https://ocr.muazaoski.online/ocr/understand" \
 
 ---
 
-## Files Added
+## Files
 
-- `app/routes/understand.py` - New API route
+- `app/routes/understand.py` - API route
 - `app/vlm_engine.py` - Qwen3-VL integration
 - `QWEN_VL_SETUP.md` - This file

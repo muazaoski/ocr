@@ -1,5 +1,5 @@
 """
-Vision Language Model Engine using Qwen3-VL-2B-Thinking.
+Vision Language Model Engine using Qwen3VL-2B-Instruct.
 Provides document understanding capabilities via local llama.cpp server.
 """
 import base64

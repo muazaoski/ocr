@@ -164,7 +164,7 @@ docker compose up -d --build
 
 ## 🧠 AI Understanding (Qwen3-VL)
 
-The OCR API includes AI-powered document understanding using **Qwen3-VL-2B-Thinking**.
+The OCR API includes AI-powered document understanding using **Qwen3VL-2B-Instruct**.
 
 ### Qwen-VL Service Commands
 
