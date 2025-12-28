@@ -193,7 +193,7 @@ Rules:
 2. "measurements" = object where each key maps to an object of {size: value} pairs
 3. Do NOT include the first column (size labels) in measurements
 4. Each measurement MUST be an object like {"36": "23 CM", "37": "23.5 CM"}
-5. "sku" = Look for any text like "SKU: XXX", "Article: XXX", "Art: XXX", "Model: XXX", "Kode: XXX", or any product code pattern like "207-00635" in the image. Extract just the code/number.
+5. "sku" = Look for any text like "SKU: XXX", "Article: XXX", "Art: XXX", "Model: XXX", "Kode: XXX", or any product code pattern. Extract ONLY the code/number part, NOT the prefix. For example: "SKU 401-02779" -> "401-02779", "Article: ABC-123" -> "ABC-123"
 
 Example input table with SKU:
 SKU 207-00635
