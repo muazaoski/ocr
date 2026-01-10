@@ -338,51 +338,33 @@ Return format:
     
     "general": "Extract all text and data from this image. Describe what you see and provide any structured data you can identify.",
     
-    "spending": """Extract ALL spending/transaction data from this document as a JSON array.
+    "spending": """Extract spending data from this document as JSON.
 
-IMPORTANT: This could be a receipt, bank statement, credit card statement, or any spending record.
-
-EXACT FORMAT REQUIRED:
+FORMAT:
 {
     "transactions": [
         {
-            "name": "Merchant or item name",
+            "name": "Store or merchant name",
             "amount": 123.45,
             "category": "food|transport|utilities|entertainment|shopping|health|education|subscription|transfer|other",
-            "date": "YYYY-MM-DD",
-            "notes": "optional extra details"
+            "date": "YYYY-MM-DD"
         }
     ],
     "summary": {
         "total": 123.45,
         "currency": "MYR",
-        "source": "receipt|bank_statement|credit_card|invoice|other"
+        "source": "receipt|bank_statement|invoice|other"
     }
 }
 
-CATEGORY RULES (auto-detect based on merchant name):
-- food: restaurants, cafes, groceries, food delivery (GrabFood, FoodPanda, etc.)
-- transport: Grab, taxi, fuel, parking, toll, public transport
-- utilities: electricity (TNB), water, internet, phone bills
-- entertainment: movies, games, streaming (Netflix, Spotify), concerts
-- shopping: retail stores, online shopping (Shopee, Lazada), clothing
-- health: pharmacy, clinic, hospital, gym
-- education: books, courses, tuition
-- subscription: recurring services, memberships
-- transfer: bank transfers, remittance (treat as spending if outgoing)
-- other: anything that doesn't fit above
-
 RULES:
-1. Extract EVERY transaction you can find
-2. For receipts: each line item is a separate transaction OR group as single total
-3. For bank statements: each debit/outgoing transaction is one entry
-4. Amount must be a NUMBER (no currency symbols)
-5. Date must be ISO format YYYY-MM-DD
-6. If date is missing, use "unknown" 
-7. Auto-categorize based on merchant/description
-8. Ignore credits/deposits/incoming transfers (only spending)
+1. For RECEIPTS: Output ONE transaction with the store name and TOTAL amount (not individual items)
+2. For BANK STATEMENTS: Output each debit transaction separately
+3. Date format: YYYY-MM-DD. If unclear, use "unknown"
+4. Amount: number only, no currency symbols
+5. Category: choose based on store type (restaurant=food, Grab=transport, TNB=utilities, etc.)
 
-Return ONLY valid JSON, no explanations."""
+Return ONLY valid JSON."""
 }
 
 
