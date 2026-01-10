@@ -338,33 +338,19 @@ Return format:
     
     "general": "Extract all text and data from this image. Describe what you see and provide any structured data you can identify.",
     
-    "spending": """Extract spending data from this document as JSON.
+    "spending": """Extract spending from this receipt/document.
 
-FORMAT:
+CRITICAL: For receipts, output ONLY ONE transaction with the TOTAL, not individual items.
+
+Output this exact JSON format:
 {
-    "transactions": [
-        {
-            "name": "Store or merchant name",
-            "amount": 123.45,
-            "category": "food|transport|utilities|entertainment|shopping|health|education|subscription|transfer|other",
-            "date": "YYYY-MM-DD"
-        }
-    ],
-    "summary": {
-        "total": 123.45,
-        "currency": "MYR",
-        "source": "receipt|bank_statement|invoice|other"
-    }
+    "transactions": [{"name": "STORE NAME", "amount": TOTAL_NUMBER, "category": "food", "date": "YYYY-MM-DD"}],
+    "summary": {"total": TOTAL_NUMBER, "currency": "MYR", "source": "receipt"}
 }
 
-RULES:
-1. For RECEIPTS: Output ONE transaction with the store name and TOTAL amount (not individual items)
-2. For BANK STATEMENTS: Output each debit transaction separately
-3. Date format: YYYY-MM-DD. If unclear, use "unknown"
-4. Amount: number only, no currency symbols
-5. Category: choose based on store type (restaurant=food, Grab=transport, TNB=utilities, etc.)
+Categories: food, transport, utilities, entertainment, shopping, health, education, subscription, transfer, other
 
-Return ONLY valid JSON."""
+Return ONLY the JSON, nothing else."""
 }
 
 
