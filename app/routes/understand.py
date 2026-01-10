@@ -58,7 +58,8 @@ async def list_presets(api_key: dict = Depends(get_api_key)):
             "receipt": "Extract receipt data including items and totals",
             "business_card": "Extract contact information from business cards",
             "table": "Extract tabular data with headers and rows",
-            "general": "General purpose extraction and description"
+            "general": "General purpose extraction and description",
+            "spending": "Extract spending/transaction data for finance tracking (receipts, bank statements)"
         }
     }
 
@@ -93,7 +94,7 @@ async def understand_document(
     file: UploadFile = File(..., description="Image file (PNG, JPEG, WebP, etc.)"),
     preset: Optional[str] = Query(
         None, 
-        description="Prompt preset (size_chart, invoice, receipt, business_card, table, general)"
+        description="Prompt preset (size_chart, invoice, receipt, business_card, table, general, spending)"
     ),
     prompt: Optional[str] = Form(
         None, 
